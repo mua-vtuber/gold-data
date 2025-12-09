@@ -1,0 +1,37 @@
+name: Initialize History Data
+
+on:
+  workflow_dispatch: # 수동 실행만
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run init script
+        run: |
+          cd scripts
+          python init_history.py
+          mv history.json ../history.json
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add history.json
+          git diff --staged --quiet || git commit -m "Initialize history data with historical gold prices"
+          git push
