@@ -1,58 +1,65 @@
 """
 초기 히스토리 데이터 생성 스크립트
-FreeGoldAPI에서 과거 데이터를 가져와서 history.json에 저장
+LBMA(런던금시장협회)에서 일별 데이터를 가져와서 history.json에 저장
 """
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# FreeGoldAPI에서 역사적 데이터 가져오기
-FREE_GOLD_API_URL = "https://freegoldapi.com/data/latest.json"
+# LBMA 일별 금시세 데이터 (1968년부터 현재까지)
+LBMA_API_URL = "https://prices.lbma.org.uk/json/gold_pm.json"
 
-def fetch_historical_data():
-    """FreeGoldAPI에서 역사적 금시세 데이터 가져오기"""
-    print("Fetching historical data from FreeGoldAPI...")
+def fetch_lbma_data():
+    """LBMA에서 일별 금시세 데이터 가져오기"""
+    print("Fetching daily gold price data from LBMA...")
     try:
-        response = requests.get(FREE_GOLD_API_URL, timeout=60)
+        response = requests.get(LBMA_API_URL, timeout=60)
         response.raise_for_status()
         data = response.json()
-        print(f"Fetched {len(data)} records")
+        print(f"Fetched {len(data)} records from LBMA")
         return data
     except Exception as e:
-        print(f"Failed to fetch historical data: {e}")
+        print(f"Failed to fetch LBMA data: {e}")
         return []
 
 def get_average_exchange_rate_for_year(year):
     """연도별 대략적인 환율 (하드코딩)"""
-    # 실제로는 환율 API에서 가져와야 하지만, 과거 데이터는 대략적인 값 사용
     exchange_rates = {
-        2024: 1350, 2023: 1300, 2022: 1290, 2021: 1150, 2020: 1180,
+        2025: 1450, 2024: 1350, 2023: 1300, 2022: 1290, 2021: 1150, 2020: 1180,
         2019: 1165, 2018: 1100, 2017: 1130, 2016: 1160, 2015: 1130,
         2014: 1050, 2013: 1095, 2012: 1125, 2011: 1107, 2010: 1155,
         2009: 1275, 2008: 1100, 2007: 930, 2006: 955, 2005: 1025,
         2004: 1145, 2003: 1190, 2002: 1250, 2001: 1290, 2000: 1130,
         1999: 1190, 1998: 1400, 1997: 950, 1996: 805, 1995: 770,
+        1994: 805, 1993: 803, 1992: 781, 1991: 733, 1990: 708,
+        1989: 671, 1988: 731, 1987: 823, 1986: 881, 1985: 870,
+        1984: 806, 1983: 776, 1982: 731, 1981: 681, 1980: 608,
+        1979: 484, 1978: 484, 1977: 484, 1976: 484, 1975: 484,
+        1974: 406, 1973: 398, 1972: 394, 1971: 373, 1970: 311,
+        1969: 304, 1968: 282,
     }
-    return exchange_rates.get(year, 1200)  # 기본값 1200
+    return exchange_rates.get(year, 1200)
 
-def process_data(raw_data):
-    """데이터 처리 및 변환"""
+def process_lbma_data(raw_data):
+    """LBMA 데이터 처리 및 변환"""
     processed = []
 
-    # 2010년부터 데이터 사용
+    # 2010년부터 데이터 사용 (일별)
     cutoff_date = "2010-01-01"
 
     for item in raw_data:
-        date_str = item.get("date", "")
-        price = item.get("price", 0)
+        date_str = item.get("d", "")
+        values = item.get("v", [])
 
         # 날짜 필터링
         if date_str < cutoff_date:
             continue
 
-        # 유효한 가격만
-        if price <= 0:
+        # USD 가격 (v 배열의 첫 번째 값)
+        if not values or values[0] is None or values[0] == 0:
             continue
+
+        price = float(values[0])
 
         try:
             year = int(date_str[:4])
@@ -97,17 +104,17 @@ def save_history(data):
     print(f"Saved {len(data)} records to history.json")
 
 def main():
-    # 1. FreeGoldAPI에서 데이터 가져오기
-    raw_data = fetch_historical_data()
+    # 1. LBMA에서 데이터 가져오기
+    raw_data = fetch_lbma_data()
 
     if not raw_data:
         print("No data fetched. Exiting.")
         return
 
     # 2. 데이터 처리
-    processed_data = process_data(raw_data)
+    processed_data = process_lbma_data(raw_data)
 
-    print(f"Processed {len(processed_data)} records (2010-present)")
+    print(f"Processed {len(processed_data)} daily records (2010-present)")
 
     if processed_data:
         print(f"Date range: {processed_data[0]['date']} ~ {processed_data[-1]['date']}")
