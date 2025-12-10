@@ -12,15 +12,15 @@ https://taniar88.github.io/gold-data/history.json
 
 ```json
 {
-  "lastUpdated": "2024-12-09",
+  "lastUpdated": "2025-12-09",
   "data": [
     {
-      "date": "2024-12-09",
-      "koreanPrice": 200.7,
-      "internationalPrice": 2650.5,
-      "internationalPriceKrw": 195.2,
-      "exchangeRate": 1400.5,
-      "premium": 2.82
+      "date": "2025-12-09",
+      "koreanPrice": 199630.0,
+      "internationalPrice": 4198.0,
+      "internationalPriceKrw": 198202.93,
+      "exchangeRate": 1468.51,
+      "premium": 0.72
     }
   ]
 }
@@ -64,18 +64,19 @@ gold-data/
 
 ### update_price.py (일일 업데이트)
 
-매일 실행되어 최신 금시세를 수집하고 history.json을 업데이트합니다.
+매일 실행되어 **어제 날짜**의 확정된 금시세를 수집하고 history.json을 업데이트합니다.
 
 ```bash
 # 환경변수 설정 필요
 export KRX_API_KEY="your_api_key"
+export KOREAEXIM_API_KEY="your_api_key"
 
 python scripts/update_price.py
 ```
 
 **데이터 소스:**
-- 국제 금시세: Gold-API.com
-- 환율: Frankfurter API
+- 국제 금시세: Gold-API.com (실시간)
+- 환율: 한국수출입은행 (매매기준율)
 - 한국 금시세: 공공데이터포털 (KRX)
 
 ### init_history.py (초기화)
@@ -104,15 +105,15 @@ python scripts/parse_woori_pdf.py
 | 소스 | API | 용도 | 인증 |
 |------|-----|------|------|
 | Gold-API.com | REST | 국제 금시세 (실시간) | 무료 |
-| Frankfurter API | REST | 환율 (USD/KRW) | 불필요 |
+| 한국수출입은행 | REST | 환율 (USD/KRW 매매기준율) | API 키 필요 |
 | 공공데이터포털 | REST | 한국 금시세 (KRX) | API 키 필요 |
 | LBMA | REST | 과거 금시세 (초기화용) | 불필요 |
 
 ## Update Schedule
 
 - **자동 업데이트:** 매일 한국시간 오전 9시 (GitHub Actions)
-- **데이터 보관:** 최근 90일
-- **오래된 데이터:** 자동 삭제
+- **데이터 수집:** 어제 날짜의 확정된 시세
+- **데이터 보관:** 전체 히스토리 (2020년~)
 
 ## GitHub Actions
 

@@ -28,6 +28,7 @@ jobs:
       - name: Update gold price data
         env:
           KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+          KOREAEXIM_API_KEY: ${{ secrets.KOREAEXIM_API_KEY }}
         run: python scripts/update_price.py
 
       - name: Commit and push changes

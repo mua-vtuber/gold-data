@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # API URLs
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
-EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest?from=USD&to=KRW"
+KOREAEXIM_API_URL = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
 KRX_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
 
 def get_international_gold_price():
@@ -19,13 +19,26 @@ def get_international_gold_price():
         print(f"Failed to fetch international gold price: {e}")
         return None
 
-def get_exchange_rate():
-    """Frankfurter API에서 환율 가져오기 (USD/KRW)"""
+def get_exchange_rate(api_key, date_str):
+    """한국수출입은행 API에서 환율 가져오기 (USD/KRW 매매기준율)"""
     try:
-        response = requests.get(EXCHANGE_RATE_URL, timeout=10)
+        params = {
+            "authkey": api_key,
+            "searchdate": date_str,
+            "data": "AP01"
+        }
+        response = requests.get(KOREAEXIM_API_URL, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates", {}).get("KRW", 0)
+
+        # USD 환율 찾기
+        for item in data:
+            if item.get("cur_unit") == "USD":
+                # 매매기준율에서 콤마 제거 후 float 변환
+                rate_str = item.get("deal_bas_r", "0").replace(",", "")
+                return float(rate_str)
+
+        return None
     except Exception as e:
         print(f"Failed to fetch exchange rate: {e}")
         return None
@@ -78,10 +91,15 @@ def main():
 
     # API 키 가져오기
     krx_api_key = os.environ.get("KRX_API_KEY", "")
+    koreaexim_api_key = os.environ.get("KOREAEXIM_API_KEY", "")
+
+    # 어제 날짜 (확정된 데이터 사용)
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    print(f"Fetching data for: {yesterday}")
 
     # 데이터 가져오기
     international_price = get_international_gold_price()
-    exchange_rate = get_exchange_rate()
+    exchange_rate = get_exchange_rate(koreaexim_api_key, yesterday) if koreaexim_api_key else None
     korean_price = get_korean_gold_price(krx_api_key) if krx_api_key else None
 
     print(f"International price: {international_price} USD/oz")
@@ -104,12 +122,9 @@ def main():
     # 프리미엄 계산
     premium = ((korean_price - international_price_krw) / international_price_krw) * 100 if international_price_krw > 0 else 0
 
-    # 오늘 날짜
-    today = datetime.now().strftime("%Y-%m-%d")
-
     # 새 데이터
     new_entry = {
-        "date": today,
+        "date": yesterday,
         "koreanPrice": round(korean_price, 2),
         "internationalPrice": round(international_price, 2),
         "internationalPriceKrw": round(international_price_krw, 2),
@@ -122,24 +137,20 @@ def main():
     # 히스토리 로드
     history = load_history()
 
-    # 오늘 데이터가 이미 있으면 업데이트, 없으면 추가
-    existing_index = next((i for i, d in enumerate(history["data"]) if d["date"] == today), None)
+    # 해당 날짜 데이터가 이미 있으면 업데이트, 없으면 추가
+    existing_index = next((i for i, d in enumerate(history["data"]) if d["date"] == yesterday), None)
     if existing_index is not None:
         history["data"][existing_index] = new_entry
-        print(f"Updated existing entry for {today}")
+        print(f"Updated existing entry for {yesterday}")
     else:
         history["data"].append(new_entry)
-        print(f"Added new entry for {today}")
+        print(f"Added new entry for {yesterday}")
 
     # 날짜순 정렬
     history["data"].sort(key=lambda x: x["date"])
 
-    # 90일 이상 된 데이터 삭제
-    cutoff_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
-    history["data"] = [d for d in history["data"] if d["date"] >= cutoff_date]
-
     # 업데이트 시간 기록
-    history["lastUpdated"] = today
+    history["lastUpdated"] = yesterday
 
     # 저장
     save_history(history)
