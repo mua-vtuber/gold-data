@@ -57,16 +57,16 @@ def get_korean_gold_price(api_key):
 
         items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
 
-        # 1kg 금 데이터 찾기
+        # 1kg 금 데이터 찾기 (상품명: "금 99.99_1Kg")
         for item in items:
-            if "1Kg" in item.get("itmsNm", "") or "1kg" in item.get("itmsNm", ""):
-                price_per_kg = float(item.get("clpr", 0))
-                return price_per_kg / 1000  # 원/g로 변환
+            itms_nm = item.get("itmsNm", "").lower()
+            if "1kg" in itms_nm and "미니" not in itms_nm:
+                # clpr은 이미 원/g 단위
+                return float(item.get("clpr", 0))
 
-        # 1kg 없으면 첫 번째 항목 사용
+        # 1kg 없으면 첫 번째 항목 사용 (clpr은 원/g 단위)
         if items:
-            price_per_kg = float(items[0].get("clpr", 0))
-            return price_per_kg / 1000
+            return float(items[0].get("clpr", 0))
 
         return None
     except Exception as e:
