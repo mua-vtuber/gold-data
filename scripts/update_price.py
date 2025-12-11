@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # API URLs
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
-KOREAEXIM_API_URL = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
+KOREAEXIM_API_URL = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
 KRX_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
 
 def get_international_gold_price():
