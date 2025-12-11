@@ -1,0 +1,40 @@
+name: Fetch Realtime Gold Price
+
+on:
+  schedule:
+    # 매시간 실행 (한국 장 운영시간: 09:00~15:30 KST = 00:00~06:30 UTC)
+    # 한국 시간 기준 09:00~16:00 (UTC 00:00~07:00) 매시간
+    - cron: '0 0-7 * * 1-5'  # 평일 UTC 0-7시 (한국 9-16시)
+  workflow_dispatch: # 수동 실행 가능
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch realtime gold price
+        env:
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+        run: python scripts/fetch_krx_realtime.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add realtime.json
+          git diff --staged --quiet || git commit -m "Update realtime gold price - $(date +'%Y-%m-%d %H:%M')"
+          git push
