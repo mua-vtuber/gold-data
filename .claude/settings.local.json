@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(copy \"d:\\Taniar\\Documents\\Git\\gold-data\\history_backup.json\" \"d:\\Taniar\\Documents\\Git\\gold-data\\history.json\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(gh run list:*)",
+      "Bash(git fetch:*)"
+    ]
+  }
+}

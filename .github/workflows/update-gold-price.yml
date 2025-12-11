@@ -2,8 +2,8 @@ name: Update Gold Price History
 
 on:
   schedule:
-    # 매일 한국시간 오전 9시 (UTC 0시)에 실행
-    - cron: '0 0 * * *'
+    # 매일 한국시간 자정 00:01 (UTC 15:01 전날)에 실행
+    - cron: '1 15 * * *'
   workflow_dispatch: # 수동 실행 가능
 
 permissions:
