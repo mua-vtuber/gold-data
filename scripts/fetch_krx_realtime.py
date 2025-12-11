@@ -3,58 +3,45 @@ import os
 import requests
 from datetime import datetime
 
-# 공공데이터포털 KRX 금시세 API
-KRX_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
+# KRX 데이터센터 AJAX API (실시간)
+KRX_AJAX_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
 
 def get_krx_gold_price():
-    """공공데이터포털에서 KRX 금 시세 가져오기"""
+    """KRX 데이터센터 AJAX API에서 금 시세 가져오기 (실시간)"""
     try:
-        api_key = os.environ.get("KRX_API_KEY", "")
-        if not api_key:
-            print("KRX_API_KEY not set")
-            return None
-
-        params = {
-            "serviceKey": api_key,
-            "numOfRows": 5,
-            "pageNo": 1,
-            "resultType": "json"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Referer": "https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201060201",
+            "X-Requested-With": "XMLHttpRequest"
         }
 
-        response = requests.get(KRX_API_URL, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        # 오늘 날짜
+        today = datetime.now().strftime("%Y%m%d")
 
-        items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        data = {
+            "bld": "dbms/MDC/STAT/standard/MDCSTAT14901",
+            "trdDd": today
+        }
+
+        response = requests.post(KRX_AJAX_URL, headers=headers, data=data, timeout=10)
+        response.raise_for_status()
+
+        result = response.json()
+        print(f"KRX AJAX response: {json.dumps(result, indent=2, ensure_ascii=False)[:500]}")
+
+        # output에서 금 데이터 찾기
+        items = result.get("output", [])
 
         # 금 99.99_1Kg 찾기
         for item in items:
-            itms_nm = item.get("itmsNm", "").lower()
-            if "1kg" in itms_nm and "미니" not in itms_nm:
-                return {
-                    "name": item.get("itmsNm", ""),
-                    "price": float(item.get("clpr", 0)),  # 이미 원/g 단위
-                    "change": float(item.get("vs", 0)),
-                    "changePercent": float(item.get("fltRt", 0)),
-                    "high": float(item.get("hipr", 0)),
-                    "low": float(item.get("lopr", 0)),
-                    "volume": item.get("trqu", "0"),
-                    "date": item.get("basDt", "")
-                }
+            isu_nm = item.get("ISU_ABBRV", "")
+            if "1kg" in isu_nm.lower() and "미니" not in isu_nm.lower():
+                return parse_krx_item(item, today)
 
         # 1Kg 없으면 첫 번째 항목 사용
         if items:
-            item = items[0]
-            return {
-                "name": item.get("itmsNm", ""),
-                "price": float(item.get("clpr", 0)),
-                "change": float(item.get("vs", 0)),
-                "changePercent": float(item.get("fltRt", 0)),
-                "high": float(item.get("hipr", 0)),
-                "low": float(item.get("lopr", 0)),
-                "volume": item.get("trqu", "0"),
-                "date": item.get("basDt", "")
-            }
+            return parse_krx_item(items[0], today)
 
         return None
     except Exception as e:
@@ -62,6 +49,29 @@ def get_krx_gold_price():
         import traceback
         traceback.print_exc()
         return None
+
+def parse_krx_item(item, today):
+    """KRX AJAX 응답 항목 파싱"""
+    def safe_float(val):
+        if not val:
+            return 0.0
+        # 콤마 제거하고 숫자로 변환
+        clean_val = str(val).replace(",", "")
+        try:
+            return float(clean_val)
+        except ValueError:
+            return 0.0
+
+    return {
+        "name": item.get("ISU_ABBRV", ""),
+        "price": safe_float(item.get("TDD_CLSPRC", 0)),  # 현재가/종가
+        "change": safe_float(item.get("CMPPREVDD_PRC", 0)),  # 전일대비
+        "changePercent": safe_float(item.get("FLUC_RT", 0)),  # 등락률
+        "high": safe_float(item.get("TDD_HGPRC", 0)),  # 고가
+        "low": safe_float(item.get("TDD_LWPRC", 0)),  # 저가
+        "volume": str(item.get("ACC_TRDVOL", "0")).replace(",", ""),  # 거래량
+        "date": today
+    }
 
 def get_international_gold_price():
     """Gold-API.com에서 국제 금시세 가져오기 (USD/oz)"""

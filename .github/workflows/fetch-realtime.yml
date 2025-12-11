@@ -27,8 +27,6 @@ jobs:
         run: pip install requests
 
       - name: Fetch realtime gold price
-        env:
-          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
         run: python scripts/fetch_krx_realtime.py
 
       - name: Commit and push changes
