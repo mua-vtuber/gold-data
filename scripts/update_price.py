@@ -1,7 +1,7 @@
 import json
 import os
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # API URLs
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
@@ -93,9 +93,11 @@ def main():
     krx_api_key = os.environ.get("KRX_API_KEY", "")
     koreaexim_api_key = os.environ.get("KOREAEXIM_API_KEY", "")
 
-    # 어제 날짜 (확정된 데이터 사용)
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    print(f"Fetching data for: {yesterday}")
+    # 어제 날짜 (KST 기준, 확정된 데이터 사용)
+    kst = timezone(timedelta(hours=9))
+    now_kst = datetime.now(kst)
+    yesterday = (now_kst - timedelta(days=1)).strftime("%Y-%m-%d")
+    print(f"Fetching data for: {yesterday} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')})")
 
     # 데이터 가져오기
     international_price = get_international_gold_price()
