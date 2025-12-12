@@ -1,7 +1,7 @@
 import json
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # KRX 데이터센터 AJAX API (실시간)
 KRX_AJAX_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
@@ -16,8 +16,9 @@ def get_krx_gold_price():
             "X-Requested-With": "XMLHttpRequest"
         }
 
-        # 오늘 날짜
-        today = datetime.now().strftime("%Y%m%d")
+        # 오늘 날짜 (KST 기준)
+        kst = timezone(timedelta(hours=9))
+        today = datetime.now(kst).strftime("%Y%m%d")
 
         data = {
             "bld": "dbms/MDC/STAT/standard/MDCSTAT14901",
@@ -96,7 +97,10 @@ def get_exchange_rate():
         return 1400  # 기본값
 
 def main():
-    print(f"Fetching realtime gold price at {datetime.now().isoformat()}")
+    # KST 시간대
+    kst = timezone(timedelta(hours=9))
+    now_kst = datetime.now(kst)
+    print(f"Fetching realtime gold price at {now_kst.isoformat()}")
 
     # 데이터 가져오기
     krx_data = get_krx_gold_price()
@@ -122,7 +126,7 @@ def main():
 
     # 결과 저장
     result = {
-        "lastUpdated": datetime.now().isoformat(),
+        "lastUpdated": now_kst.isoformat(),
         "korean": {
             "price": round(korean_price, 2),
             "change": round(korean_change, 2),
