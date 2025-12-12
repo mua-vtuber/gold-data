@@ -2,9 +2,16 @@ name: Update Gold Price History
 
 on:
   schedule:
-    # 매일 한국시간 자정 00:01 (UTC 15:01 전날)에 실행
-    - cron: '1 15 * * *'
+    # 장 종료 후 16:00 KST (UTC 07:00) - KRX 직접 API로 당일 데이터
+    - cron: '0 7 * * 1-5'
+    # 오전 10:00 KST (UTC 01:00) - 공공데이터포털 API로 어제 데이터 확인
+    - cron: '0 1 * * 1-5'
   workflow_dispatch: # 수동 실행 가능
+    inputs:
+      mode:
+        description: 'Mode: realtime (당일) or daily (어제)'
+        required: false
+        default: 'daily'
 
 permissions:
   contents: write
@@ -25,16 +32,30 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Determine mode
+        id: mode
+        run: |
+          # 수동 실행 시 입력값 사용
+          if [ -n "${{ github.event.inputs.mode }}" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          # UTC 07시 (KST 16시) = realtime 모드
+          elif [ "$(date -u +%H)" = "07" ]; then
+            echo "mode=realtime" >> $GITHUB_OUTPUT
+          # 그 외 = daily 모드
+          else
+            echo "mode=daily" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update gold price data
         env:
           KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
           KOREAEXIM_API_KEY: ${{ secrets.KOREAEXIM_API_KEY }}
-        run: python scripts/update_price.py
+        run: python scripts/update_price.py ${{ steps.mode.outputs.mode }}
 
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add history.json
-          git diff --staged --quiet || git commit -m "Update gold price data - $(date +'%Y-%m-%d')"
+          git diff --staged --quiet || git commit -m "Update gold price data - $(date +'%Y-%m-%d %H:%M') [${{ steps.mode.outputs.mode }}]"
           git push

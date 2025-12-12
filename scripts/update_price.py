@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import requests
 from datetime import datetime, timedelta, timezone
 
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
 KOREAEXIM_API_URL = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
 KRX_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
+KRX_AJAX_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
 
 def get_international_gold_price():
     """Gold-API.com에서 국제 금시세 가져오기 (USD/oz)"""
@@ -73,6 +75,44 @@ def get_korean_gold_price(api_key):
         print(f"Failed to fetch Korean gold price: {e}")
         return None
 
+def get_korean_gold_price_krx_direct(date_str):
+    """KRX 직접 API에서 한국 금시세 가져오기 (원/g) - 장 종료 후 사용"""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Referer": "https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201060201",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+
+        data = {
+            "bld": "dbms/MDC/STAT/standard/MDCSTAT14901",
+            "trdDd": date_str.replace("-", "")
+        }
+
+        response = requests.post(KRX_AJAX_URL, headers=headers, data=data, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+
+        items = result.get("output", [])
+
+        # 금 99.99_1Kg 찾기
+        for item in items:
+            isu_nm = item.get("ISU_ABBRV", "").lower()
+            if "1kg" in isu_nm and "미니" not in isu_nm:
+                price_str = str(item.get("TDD_CLSPRC", "0")).replace(",", "")
+                return float(price_str)
+
+        # 1Kg 없으면 첫 번째 항목 사용
+        if items:
+            price_str = str(items[0].get("TDD_CLSPRC", "0")).replace(",", "")
+            return float(price_str)
+
+        return None
+    except Exception as e:
+        print(f"Failed to fetch Korean gold price from KRX direct: {e}")
+        return None
+
 def load_history():
     """기존 히스토리 파일 로드"""
     try:
@@ -87,22 +127,32 @@ def save_history(history):
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 def main():
-    print("Fetching gold price data...")
+    # 모드 결정: realtime (장 종료 후, 당일 데이터) / daily (오전, 어제 데이터)
+    mode = sys.argv[1] if len(sys.argv) > 1 else "daily"
+    print(f"Mode: {mode}")
 
     # API 키 가져오기
     krx_api_key = os.environ.get("KRX_API_KEY", "")
     koreaexim_api_key = os.environ.get("KOREAEXIM_API_KEY", "")
 
-    # 어제 날짜 (KST 기준, 확정된 데이터 사용)
+    # KST 시간대
     kst = timezone(timedelta(hours=9))
     now_kst = datetime.now(kst)
-    yesterday = (now_kst - timedelta(days=1)).strftime("%Y-%m-%d")
-    print(f"Fetching data for: {yesterday} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')})")
+
+    if mode == "realtime":
+        # 장 종료 후: 오늘 날짜, KRX 직접 API 사용
+        target_date = now_kst.strftime("%Y-%m-%d")
+        print(f"Fetching data for: {target_date} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')}) [REALTIME MODE]")
+        korean_price = get_korean_gold_price_krx_direct(target_date)
+    else:
+        # 오전: 어제 날짜, 공공데이터포털 API 사용
+        target_date = (now_kst - timedelta(days=1)).strftime("%Y-%m-%d")
+        print(f"Fetching data for: {target_date} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')}) [DAILY MODE]")
+        korean_price = get_korean_gold_price(krx_api_key) if krx_api_key else None
 
     # 데이터 가져오기
     international_price = get_international_gold_price()
-    exchange_rate = get_exchange_rate(koreaexim_api_key, yesterday) if koreaexim_api_key else None
-    korean_price = get_korean_gold_price(krx_api_key) if krx_api_key else None
+    exchange_rate = get_exchange_rate(koreaexim_api_key, target_date) if koreaexim_api_key else None
 
     print(f"International price: {international_price} USD/oz")
     print(f"Exchange rate: {exchange_rate} KRW/USD")
@@ -126,7 +176,7 @@ def main():
 
     # 새 데이터
     new_entry = {
-        "date": yesterday,
+        "date": target_date,
         "koreanPrice": round(korean_price, 2),
         "internationalPrice": round(international_price, 2),
         "internationalPriceKrw": round(international_price_krw, 2),
@@ -140,19 +190,19 @@ def main():
     history = load_history()
 
     # 해당 날짜 데이터가 이미 있으면 업데이트, 없으면 추가
-    existing_index = next((i for i, d in enumerate(history["data"]) if d["date"] == yesterday), None)
+    existing_index = next((i for i, d in enumerate(history["data"]) if d["date"] == target_date), None)
     if existing_index is not None:
         history["data"][existing_index] = new_entry
-        print(f"Updated existing entry for {yesterday}")
+        print(f"Updated existing entry for {target_date}")
     else:
         history["data"].append(new_entry)
-        print(f"Added new entry for {yesterday}")
+        print(f"Added new entry for {target_date}")
 
     # 날짜순 정렬
     history["data"].sort(key=lambda x: x["date"])
 
     # 업데이트 시간 기록
-    history["lastUpdated"] = yesterday
+    history["lastUpdated"] = target_date
 
     # 저장
     save_history(history)
