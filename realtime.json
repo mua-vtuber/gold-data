@@ -1,15 +1,15 @@
 {
-  "lastUpdated": "2025-12-12T01:54:39.089561",
+  "lastUpdated": "2025-12-12T12:26:07.097820+09:00",
   "korean": {
-    "price": 202710.0,
-    "change": 2560.0,
-    "changePercent": 1.34,
+    "price": 203020.0,
+    "change": 2870.0,
+    "changePercent": 1.42,
     "source": "KRX"
   },
   "international": {
-    "priceUsd": 4272.3,
-    "priceKrw": 202072.15
+    "priceUsd": 4272.2,
+    "priceKrw": 202067.44
   },
   "exchangeRate": 1471.14,
-  "premium": 0.32
+  "premium": 0.47
 }
