@@ -11700,10 +11700,10 @@
     {
       "date": "2025-12-15",
       "koreanPrice": 206340.0,
-      "internationalPrice": 4343.2,
-      "internationalPriceKrw": 205615.52,
+      "internationalPrice": 4305.7,
+      "internationalPriceKrw": 203840.2,
       "exchangeRate": 1472.5,
-      "premium": 0.35
+      "premium": 1.23
     }
   ]
 }
