@@ -2,10 +2,12 @@ name: Fetch Realtime Gold Price
 
 on:
   schedule:
-    # 매시간 실행 (한국 장 운영시간: 09:00~15:30 KST = 00:00~06:30 UTC)
-    # 한국 시간 기준 09:00~16:00 (UTC 00:00~07:00) 매시간
-    - cron: '0 0-7 * * 1-5'  # 평일 UTC 0-7시 (한국 9-16시)
+    # 5분마다 실행 (한국 장 운영시간: 09:00~15:30 KST = 00:00~06:30 UTC)
+    # 한국 시간 기준 09:00~16:00 (UTC 00:00~07:00) 5분마다
+    - cron: '*/5 0-7 * * 1-5'  # 평일 UTC 0-7시 (한국 9-16시) 5분마다
   workflow_dispatch: # 수동 실행 가능
+  repository_dispatch: # 외부 cron 서비스에서 트리거 가능
+    types: [fetch-realtime]
 
 permissions:
   contents: write

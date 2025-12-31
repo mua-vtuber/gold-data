@@ -12,6 +12,8 @@ on:
         description: 'Mode: realtime (당일) or daily (어제)'
         required: false
         default: 'daily'
+  repository_dispatch: # 외부 cron 서비스에서 트리거 가능
+    types: [update-realtime, update-daily]
 
 permissions:
   contents: write
@@ -35,8 +37,13 @@ jobs:
       - name: Determine mode
         id: mode
         run: |
+          # repository_dispatch 이벤트인 경우
+          if [ "${{ github.event.action }}" = "update-realtime" ]; then
+            echo "mode=realtime" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.action }}" = "update-daily" ]; then
+            echo "mode=daily" >> $GITHUB_OUTPUT
           # 수동 실행 시 입력값 사용
-          if [ -n "${{ github.event.inputs.mode }}" ]; then
+          elif [ -n "${{ github.event.inputs.mode }}" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
           # UTC 07시 (KST 16시) = realtime 모드
           elif [ "$(date -u +%H)" = "07" ]; then
