@@ -13,8 +13,8 @@ def get_krx_gold_price():
         # KST 시간대
         kst = timezone(timedelta(hours=9))
 
-        # 최근 7일간 데이터 검색 (휴일/주말 고려)
-        for days_ago in range(7):
+        # 최근 5일간 데이터 검색 (휴일/주말/연휴 고려)
+        for days_ago in range(5):
             target_date = (datetime.now(kst) - timedelta(days=days_ago)).strftime("%Y%m%d")
 
             params = {
@@ -56,7 +56,7 @@ def get_krx_gold_price():
 
             print(f"No data for {target_date}, trying previous day...")
 
-        print("No gold price data found in the last 7 days")
+        print("No gold price data found in the last 5 days")
         return None
 
     except Exception as e:
@@ -136,6 +136,7 @@ def main():
     korean_price = krx_data["price"] if krx_data else 0
     korean_change = krx_data["change"] if krx_data else 0
     korean_change_percent = krx_data["changePercent"] if krx_data else 0
+    data_date = krx_data["date"] if krx_data else ""
 
     # 국제 금시세를 원/g로 변환
     international_price_krw = (international_price / 31.1035) * exchange_rate if international_price else 0
@@ -148,6 +149,7 @@ def main():
     # 결과 저장
     result = {
         "lastUpdated": now_kst.isoformat(),
+        "dataDate": data_date,  # 실제 시세 날짜 (YYYYMMDD)
         "korean": {
             "price": round(korean_price, 2),
             "change": round(korean_change, 2),
