@@ -3,75 +3,96 @@ import os
 import requests
 from datetime import datetime, timedelta, timezone
 
-# KRX 데이터센터 AJAX API (실시간)
-KRX_AJAX_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
+# 금융위원회 일반상품시세정보 공식 API
+OFFICIAL_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
+SERVICE_KEY = "81f920f973031035ae7e27058a06035d966ed25b1b4ca0f1c1a3806add8be6d8"
 
 def get_krx_gold_price():
-    """KRX 데이터센터 AJAX API에서 금 시세 가져오기 (실시간)"""
+    """금융위원회 공식 API에서 금 시세 가져오기"""
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Referer": "https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201060201",
-            "X-Requested-With": "XMLHttpRequest"
-        }
-
-        # 오늘 날짜 (KST 기준)
+        # KST 시간대
         kst = timezone(timedelta(hours=9))
-        today = datetime.now(kst).strftime("%Y%m%d")
 
-        data = {
-            "bld": "dbms/MDC/STAT/standard/MDCSTAT14901",
-            "trdDd": today
-        }
+        # 최근 7일간 데이터 검색 (휴일/주말 고려)
+        for days_ago in range(7):
+            target_date = (datetime.now(kst) - timedelta(days=days_ago)).strftime("%Y%m%d")
 
-        response = requests.post(KRX_AJAX_URL, headers=headers, data=data, timeout=10)
-        response.raise_for_status()
+            params = {
+                "serviceKey": SERVICE_KEY,
+                "pageNo": "1",
+                "numOfRows": "10",
+                "resultType": "json",
+                "basDt": target_date
+            }
 
-        result = response.json()
-        print(f"KRX AJAX response: {json.dumps(result, indent=2, ensure_ascii=False)[:500]}")
+            response = requests.get(OFFICIAL_API_URL, params=params, timeout=10)
+            response.raise_for_status()
 
-        # output에서 금 데이터 찾기
-        items = result.get("output", [])
+            result = response.json()
 
-        # 금 99.99_1Kg 찾기
-        for item in items:
-            isu_nm = item.get("ISU_ABBRV", "")
-            if "1kg" in isu_nm.lower() and "미니" not in isu_nm.lower():
-                return parse_krx_item(item, today)
+            # API 응답 확인
+            header = result.get("response", {}).get("header", {})
+            if header.get("resultCode") != "00":
+                print(f"API Error: {header.get('resultMsg')}")
+                continue
 
-        # 1Kg 없으면 첫 번째 항목 사용
-        if items:
-            return parse_krx_item(items[0], today)
+            body = result.get("response", {}).get("body", {})
+            total_count = body.get("totalCount", 0)
 
+            if total_count > 0:
+                items = body.get("items", {}).get("item", [])
+
+                # 금 99.99_1kg 찾기
+                for item in items:
+                    itms_nm = item.get("itmsNm", "")
+                    if "1kg" in itms_nm.lower() and "미니" not in itms_nm.lower():
+                        print(f"Found gold data for {target_date}: {itms_nm}")
+                        return parse_official_api_item(item)
+
+                # 1kg 없으면 첫 번째 항목 사용
+                if items:
+                    print(f"Using first item for {target_date}: {items[0].get('itmsNm')}")
+                    return parse_official_api_item(items[0])
+
+            print(f"No data for {target_date}, trying previous day...")
+
+        print("No gold price data found in the last 7 days")
         return None
+
     except Exception as e:
-        print(f"Failed to fetch KRX gold price: {e}")
+        print(f"Failed to fetch official API gold price: {e}")
         import traceback
         traceback.print_exc()
         return None
 
-def parse_krx_item(item, today):
-    """KRX AJAX 응답 항목 파싱"""
+def parse_official_api_item(item):
+    """공식 API 응답 항목 파싱"""
     def safe_float(val):
         if not val:
             return 0.0
-        # 콤마 제거하고 숫자로 변환
-        clean_val = str(val).replace(",", "")
+        # 문자열로 변환 후 숫자로
         try:
-            return float(clean_val)
+            return float(str(val))
         except ValueError:
             return 0.0
 
+    def safe_int(val):
+        if not val:
+            return 0
+        try:
+            return int(str(val))
+        except ValueError:
+            return 0
+
     return {
-        "name": item.get("ISU_ABBRV", ""),
-        "price": safe_float(item.get("TDD_CLSPRC", 0)),  # 현재가/종가
-        "change": safe_float(item.get("CMPPREVDD_PRC", 0)),  # 전일대비
-        "changePercent": safe_float(item.get("FLUC_RT", 0)),  # 등락률
-        "high": safe_float(item.get("TDD_HGPRC", 0)),  # 고가
-        "low": safe_float(item.get("TDD_LWPRC", 0)),  # 저가
-        "volume": str(item.get("ACC_TRDVOL", "0")).replace(",", ""),  # 거래량
-        "date": today
+        "name": item.get("itmsNm", ""),
+        "price": safe_float(item.get("clpr", 0)),  # 종가
+        "change": safe_float(item.get("vs", 0)),  # 전일대비
+        "changePercent": safe_float(item.get("fltRt", 0)),  # 등락률
+        "high": safe_float(item.get("hipr", 0)),  # 고가
+        "low": safe_float(item.get("lopr", 0)),  # 저가
+        "volume": safe_int(item.get("trqu", 0)),  # 거래량
+        "date": item.get("basDt", "")
     }
 
 def get_international_gold_price():
