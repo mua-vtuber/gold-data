@@ -132,7 +132,7 @@ def main():
     print(f"Mode: {mode}")
 
     # API 키 가져오기
-    krx_api_key = os.environ.get("KRX_API_KEY", "")
+    koreadata_api_key = os.environ.get("KOREADATA_API_KEY", "")
     koreaexim_api_key = os.environ.get("KOREAEXIM_API_KEY", "")
 
     # KST 시간대
@@ -148,7 +148,7 @@ def main():
         # 오전: 어제 날짜, 공공데이터포털 API 사용
         target_date = (now_kst - timedelta(days=1)).strftime("%Y-%m-%d")
         print(f"Fetching data for: {target_date} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')}) [DAILY MODE]")
-        korean_price = get_korean_gold_price(krx_api_key) if krx_api_key else None
+        korean_price = get_korean_gold_price(koreadata_api_key) if koreadata_api_key else None
 
     # 데이터 가져오기
     international_price = get_international_gold_price()
