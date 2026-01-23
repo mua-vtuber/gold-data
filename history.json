@@ -11811,11 +11811,11 @@
     },
     {
       "date": "2026-01-22",
-      "koreanPrice": 235759.6,
-      "internationalPrice": 4833.9,
-      "internationalPriceKrw": 228892.82,
+      "koreanPrice": 229700.0,
+      "internationalPrice": 4953.4,
+      "internationalPriceKrw": 234551.33,
       "exchangeRate": 1472.8,
-      "premium": 3.0
+      "premium": -2.07
     }
   ]
 }
