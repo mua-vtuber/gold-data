@@ -12220,10 +12220,10 @@
     {
       "date": "2026-04-21",
       "koreanPrice": 225750.0,
-      "internationalPrice": 4760.4,
-      "internationalPriceKrw": 225841.02,
+      "internationalPrice": 4756.7,
+      "internationalPriceKrw": 225665.5,
       "exchangeRate": 1475.6,
-      "premium": -0.04
+      "premium": 0.04
     }
   ]
 }
