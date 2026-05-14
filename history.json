@@ -12316,10 +12316,10 @@
     {
       "date": "2026-05-13",
       "koreanPrice": 224530.0,
-      "internationalPrice": 4709.2,
-      "internationalPriceKrw": 224729.24,
+      "internationalPrice": 4691.5,
+      "internationalPriceKrw": 223884.56,
       "exchangeRate": 1484.3,
-      "premium": -0.09
+      "premium": 0.29
     }
   ]
 }
