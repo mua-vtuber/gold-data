@@ -12532,10 +12532,10 @@
     {
       "date": "2026-07-02",
       "koreanPrice": 202550.0,
-      "internationalPrice": 4178.1,
-      "internationalPriceKrw": 208800.9,
+      "internationalPrice": 4174.7,
+      "internationalPriceKrw": 208630.99,
       "exchangeRate": 1554.4,
-      "premium": -2.99
+      "premium": -2.91
     }
   ]
 }
