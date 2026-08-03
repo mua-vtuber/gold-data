@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-07-30",
+  "lastUpdated": "2026-07-31",
   "data": [
     {
       "date": "2020-01-02",
@@ -11759,7 +11759,7 @@
       "internationalPrice": 4480.6,
       "internationalPriceKrw": 213690.49,
       "exchangeRate": 1483.4,
-      "premium": 0.91
+      "premium": 1.42
     },
     {
       "date": "2025-12-26",
@@ -11783,7 +11783,7 @@
       "internationalPrice": 4356.3,
       "internationalPriceKrw": 200829.43,
       "exchangeRate": 1433.9,
-      "premium": 4.02
+      "premium": 2.67
     },
     {
       "date": "2025-12-31",
@@ -11792,6 +11792,114 @@
       "internationalPriceKrw": 199613.18,
       "exchangeRate": 1434.9,
       "premium": 3.0
+    },
+    {
+      "date": "2026-01-02",
+      "koreanPrice": 208800.0,
+      "internationalPrice": 4352.95,
+      "internationalPriceKrw": 202210.26,
+      "exchangeRate": 1444.87,
+      "premium": 3.26,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-05",
+      "koreanPrice": 211250.0,
+      "internationalPrice": 4456.4,
+      "internationalPriceKrw": 207647.74,
+      "exchangeRate": 1449.28,
+      "premium": 1.73,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-06",
+      "koreanPrice": 211280.0,
+      "internationalPrice": 4490.35,
+      "internationalPriceKrw": 209138.7,
+      "exchangeRate": 1448.65,
+      "premium": 1.02,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-07",
+      "koreanPrice": 209280.0,
+      "internationalPrice": 4438.0,
+      "internationalPriceKrw": 206562.09,
+      "exchangeRate": 1447.68,
+      "premium": 1.32,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-08",
+      "koreanPrice": 207500.0,
+      "internationalPrice": 4429.35,
+      "internationalPriceKrw": 206818.82,
+      "exchangeRate": 1452.31,
+      "premium": 0.33,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-09",
+      "koreanPrice": 210240.0,
+      "internationalPrice": 4493.85,
+      "internationalPriceKrw": 210918.45,
+      "exchangeRate": 1459.84,
+      "premium": -0.32,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-12",
+      "koreanPrice": 216200.0,
+      "internationalPrice": 4612.95,
+      "internationalPriceKrw": 217556.95,
+      "exchangeRate": 1466.91,
+      "premium": -0.62,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-13",
+      "koreanPrice": 217850.0,
+      "internationalPrice": 4623.05,
+      "internationalPriceKrw": 219098.99,
+      "exchangeRate": 1474.08,
+      "premium": -0.57,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-14",
+      "koreanPrice": 220460.0,
+      "internationalPrice": 4606.5,
+      "internationalPriceKrw": 218511.62,
+      "exchangeRate": 1475.41,
+      "premium": 0.89,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-15",
+      "koreanPrice": 218580.0,
+      "internationalPrice": 4610.85,
+      "internationalPriceKrw": 217666.93,
+      "exchangeRate": 1468.32,
+      "premium": 0.42,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-16",
+      "koreanPrice": 218720.0,
+      "internationalPrice": 4611.05,
+      "internationalPriceKrw": 218359.79,
+      "exchangeRate": 1472.93,
+      "premium": 0.16,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-01-19",
+      "koreanPrice": 221930.0,
+      "internationalPrice": 4666.85,
+      "internationalPriceKrw": 221042.76,
+      "exchangeRate": 1473.2,
+      "premium": 0.4,
+      "premiumAvailable": true
     },
     {
       "date": "2026-01-20",
@@ -11858,6 +11966,15 @@
       "premium": 13.71
     },
     {
+      "date": "2026-01-30",
+      "koreanPrice": 253000.0,
+      "internationalPrice": 4981.85,
+      "internationalPriceKrw": 231066.16,
+      "exchangeRate": 1442.63,
+      "premium": 9.49,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-02-02",
       "koreanPrice": 227700.0,
       "internationalPrice": 4910.6,
@@ -11888,6 +12005,15 @@
       "internationalPriceKrw": 226165.76,
       "exchangeRate": 1451.2,
       "premium": 4.1
+    },
+    {
+      "date": "2026-02-06",
+      "koreanPrice": 231530.0,
+      "internationalPrice": 4948.0,
+      "internationalPriceKrw": 233439.78,
+      "exchangeRate": 1467.42,
+      "premium": -0.82,
+      "premiumAvailable": true
     },
     {
       "date": "2026-02-09",
@@ -11922,12 +12048,30 @@
       "premium": 1.28
     },
     {
+      "date": "2026-02-13",
+      "koreanPrice": 231050.0,
+      "internationalPrice": 4994.95,
+      "internationalPriceKrw": 232287.22,
+      "exchangeRate": 1446.45,
+      "premium": -0.53,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-02-19",
       "koreanPrice": 233270.0,
       "internationalPrice": 5035.4,
       "internationalPriceKrw": 233625.98,
       "exchangeRate": 1443.1,
       "premium": -0.15
+    },
+    {
+      "date": "2026-02-20",
+      "koreanPrice": 234040.0,
+      "internationalPrice": 5053.2,
+      "internationalPriceKrw": 235517.61,
+      "exchangeRate": 1449.66,
+      "premium": -0.63,
+      "premiumAvailable": true
     },
     {
       "date": "2026-02-23",
@@ -12042,6 +12186,15 @@
       "premium": 3.0
     },
     {
+      "date": "2026-03-16",
+      "koreanPrice": 240400.0,
+      "internationalPrice": 4994.85,
+      "internationalPriceKrw": 239396.62,
+      "exchangeRate": 1490.75,
+      "premium": 0.42,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-03-17",
       "koreanPrice": 239550.0,
       "internationalPrice": 4997.5,
@@ -12146,6 +12299,15 @@
       "premium": -1.55
     },
     {
+      "date": "2026-04-03",
+      "koreanPrice": 227340.0,
+      "internationalPrice": null,
+      "internationalPriceKrw": null,
+      "exchangeRate": null,
+      "premium": null,
+      "premiumAvailable": false
+    },
+    {
       "date": "2026-04-06",
       "koreanPrice": 225850.0,
       "internationalPrice": 4652.8,
@@ -12176,6 +12338,15 @@
       "internationalPriceKrw": 225248.38,
       "exchangeRate": 1476.1,
       "premium": 0.03
+    },
+    {
+      "date": "2026-04-10",
+      "koreanPrice": 226700.0,
+      "internationalPrice": 4773.75,
+      "internationalPriceKrw": 227651.56,
+      "exchangeRate": 1483.27,
+      "premium": -0.42,
+      "premiumAvailable": true
     },
     {
       "date": "2026-04-13",
@@ -12210,6 +12381,15 @@
       "premium": 0.87
     },
     {
+      "date": "2026-04-17",
+      "koreanPrice": 228000.0,
+      "internationalPrice": 4870.5,
+      "internationalPriceKrw": 231595.18,
+      "exchangeRate": 1478.99,
+      "premium": -1.55,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-04-20",
       "koreanPrice": 227220.0,
       "internationalPrice": 4791.0,
@@ -12240,6 +12420,15 @@
       "internationalPriceKrw": 222840.7,
       "exchangeRate": 1477.6,
       "premium": 0.48
+    },
+    {
+      "date": "2026-04-24",
+      "koreanPrice": 222770.0,
+      "internationalPrice": 4711.65,
+      "internationalPriceKrw": 223746.38,
+      "exchangeRate": 1477.04,
+      "premium": -0.44,
+      "premiumAvailable": true
     },
     {
       "date": "2026-04-27",
@@ -12298,6 +12487,15 @@
       "premium": -0.16
     },
     {
+      "date": "2026-05-08",
+      "koreanPrice": 223110.0,
+      "internationalPrice": 4741.4,
+      "internationalPriceKrw": 223595.12,
+      "exchangeRate": 1466.78,
+      "premium": -0.22,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-05-11",
       "koreanPrice": 220100.0,
       "internationalPrice": 4703.8,
@@ -12328,6 +12526,15 @@
       "internationalPriceKrw": 218476.35,
       "exchangeRate": 1495.1,
       "premium": 2.35
+    },
+    {
+      "date": "2026-05-15",
+      "koreanPrice": 220140.0,
+      "internationalPrice": 4528.0,
+      "internationalPriceKrw": 218312.39,
+      "exchangeRate": 1499.62,
+      "premium": 0.84,
+      "premiumAvailable": true
     },
     {
       "date": "2026-05-18",
@@ -12362,6 +12569,15 @@
       "premium": -0.94
     },
     {
+      "date": "2026-05-22",
+      "koreanPrice": 219080.0,
+      "internationalPrice": 4506.15,
+      "internationalPriceKrw": 219856.54,
+      "exchangeRate": 1517.55,
+      "premium": -0.35,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-05-26",
       "koreanPrice": 218020.0,
       "internationalPrice": 4449.2,
@@ -12386,6 +12602,15 @@
       "premium": -4.14
     },
     {
+      "date": "2026-05-29",
+      "koreanPrice": 216500.0,
+      "internationalPrice": 4545.95,
+      "internationalPriceKrw": 220149.76,
+      "exchangeRate": 1506.27,
+      "premium": -1.66,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-06-01",
       "koreanPrice": 215720.0,
       "internationalPrice": 4530.0,
@@ -12408,6 +12633,15 @@
       "internationalPriceKrw": 217534.77,
       "exchangeRate": 1515.6,
       "premium": 0.32
+    },
+    {
+      "date": "2026-06-05",
+      "koreanPrice": 218550.0,
+      "internationalPrice": 4365.15,
+      "internationalPriceKrw": 216258.32,
+      "exchangeRate": 1540.93,
+      "premium": 1.06,
+      "premiumAvailable": true
     },
     {
       "date": "2026-06-08",
@@ -12442,6 +12676,15 @@
       "premium": -2.46
     },
     {
+      "date": "2026-06-12",
+      "koreanPrice": 204000.0,
+      "internationalPrice": 4185.95,
+      "internationalPriceKrw": 204591.86,
+      "exchangeRate": 1520.21,
+      "premium": -0.29,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-06-15",
       "koreanPrice": 208820.0,
       "internationalPrice": 4318.3,
@@ -12472,6 +12715,15 @@
       "internationalPriceKrw": 201680.73,
       "exchangeRate": 1512.8,
       "premium": 4.07
+    },
+    {
+      "date": "2026-06-19",
+      "koreanPrice": 202520.0,
+      "internationalPrice": 4150.9,
+      "internationalPriceKrw": 204493.56,
+      "exchangeRate": 1532.31,
+      "premium": -0.97,
+      "premiumAvailable": true
     },
     {
       "date": "2026-06-22",
@@ -12506,6 +12758,15 @@
       "premium": -1.99
     },
     {
+      "date": "2026-06-26",
+      "koreanPrice": 196890.0,
+      "internationalPrice": 4072.05,
+      "internationalPriceKrw": 201153.65,
+      "exchangeRate": 1536.47,
+      "premium": -2.12,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-06-29",
       "koreanPrice": 199730.0,
       "internationalPrice": 4029.7,
@@ -12538,6 +12799,15 @@
       "premium": -2.91
     },
     {
+      "date": "2026-07-03",
+      "koreanPrice": 204340.0,
+      "internationalPrice": 4164.15,
+      "internationalPriceKrw": 205001.73,
+      "exchangeRate": 1531.23,
+      "premium": -0.32,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-07-06",
       "koreanPrice": 203780.0,
       "internationalPrice": 4137.5,
@@ -12568,6 +12838,15 @@
       "internationalPriceKrw": 199449.43,
       "exchangeRate": 1509.9,
       "premium": -0.82
+    },
+    {
+      "date": "2026-07-10",
+      "koreanPrice": 198270.0,
+      "internationalPrice": 4099.15,
+      "internationalPriceKrw": 198334.36,
+      "exchangeRate": 1504.92,
+      "premium": -0.03,
+      "premiumAvailable": true
     },
     {
       "date": "2026-07-13",
@@ -12618,12 +12897,30 @@
       "premium": -2.01
     },
     {
+      "date": "2026-07-22",
+      "koreanPrice": 195830.0,
+      "internationalPrice": 4155.1,
+      "internationalPriceKrw": 197759.17,
+      "exchangeRate": 1480.35,
+      "premium": -0.98,
+      "premiumAvailable": true
+    },
+    {
       "date": "2026-07-23",
       "koreanPrice": 193990.0,
       "internationalPrice": 4055.9,
       "internationalPriceKrw": 193109.53,
       "exchangeRate": 1480.9,
       "premium": 0.46
+    },
+    {
+      "date": "2026-07-24",
+      "koreanPrice": 189810.0,
+      "internationalPrice": 4067.3,
+      "internationalPriceKrw": 191050.05,
+      "exchangeRate": 1461.0,
+      "premium": -0.65,
+      "premiumAvailable": true
     },
     {
       "date": "2026-07-27",
@@ -12656,6 +12953,15 @@
       "internationalPriceKrw": 188948.68,
       "exchangeRate": 1450.1,
       "premium": -1.57
+    },
+    {
+      "date": "2026-07-31",
+      "koreanPrice": 187460.0,
+      "internationalPrice": 4026.6,
+      "internationalPriceKrw": 186887.01,
+      "exchangeRate": 1443.61,
+      "premium": 0.31,
+      "premiumAvailable": true
     }
   ]
 }

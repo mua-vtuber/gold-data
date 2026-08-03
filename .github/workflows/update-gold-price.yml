@@ -2,14 +2,14 @@ name: Update Gold Price History
 
 on:
   schedule:
-    # 장 종료 후 16:00 KST (UTC 07:00) - KRX 직접 API로 당일 데이터
+    # 오후 16:00 KST (UTC 07:00) - 공공데이터포털 게시분 재확인
     - cron: '0 7 * * 1-5'
-    # 오전 10:00 KST (UTC 01:00) - 공공데이터포털 API로 어제 데이터 확인
+    # 오전 10:00 KST (UTC 01:00) - 공공데이터포털에서 누락 거래일 확인
     - cron: '0 1 * * 1-5'
   workflow_dispatch: # 수동 실행 가능
     inputs:
       mode:
-        description: 'Mode: realtime (당일) or daily (어제)'
+        description: 'Mode: realtime (오후 재확인) or daily (공식 이력 동기화)'
         required: false
         default: 'daily'
   repository_dispatch: # 외부 cron 서비스에서 트리거 가능
@@ -34,29 +34,37 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Run regression tests
+        run: python -m unittest discover -s tests
+
       - name: Determine mode
         id: mode
         run: |
-          # repository_dispatch 이벤트인 경우
           if [ "${{ github.event.action }}" = "update-realtime" ]; then
-            echo "mode=realtime" >> $GITHUB_OUTPUT
+            mode=realtime
           elif [ "${{ github.event.action }}" = "update-daily" ]; then
-            echo "mode=daily" >> $GITHUB_OUTPUT
-          # 수동 실행 시 입력값 사용
-          elif [ -n "${{ github.event.inputs.mode }}" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          # UTC 07시 (KST 16시) = realtime 모드
-          elif [ "$(date -u +%H)" = "07" ]; then
-            echo "mode=realtime" >> $GITHUB_OUTPUT
-          # 그 외 = daily 모드
+            mode=daily
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            mode="${{ github.event.inputs.mode }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              '0 7 * * 1-5') mode=realtime ;;
+              '0 1 * * 1-5') mode=daily ;;
+              *) echo "Unsupported schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
+            esac
           else
-            echo "mode=daily" >> $GITHUB_OUTPUT
+            echo "Unsupported event: ${{ github.event_name }}" >&2
+            exit 1
           fi
+
+          case "$mode" in
+            realtime|daily) echo "mode=$mode" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unsupported mode: $mode" >&2; exit 1 ;;
+          esac
 
       - name: Update gold price data
         env:
           KOREADATA_API_KEY: ${{ secrets.KOREADATA_API_KEY }}
-          KOREAEXIM_API_KEY: ${{ secrets.KOREAEXIM_API_KEY }}
         run: python scripts/update_price.py ${{ steps.mode.outputs.mode }}
 
       - name: Commit and push changes

@@ -1,176 +1,208 @@
 import json
+import math
 import os
-import requests
+import sys
 from datetime import datetime, timedelta, timezone
 
-# 금융위원회 일반상품시세정보 공식 API
+import requests
+
+
 OFFICIAL_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService/getGoldPriceInfo"
-SERVICE_KEY = "81f920f973031035ae7e27058a06035d966ed25b1b4ca0f1c1a3806add8be6d8"
+GOLD_API_URL = "https://api.gold-api.com/price/XAU"
+FRANKFURTER_URL = "https://api.frankfurter.app/latest?from=USD&to=KRW"
+TROY_OUNCE_GRAMS = 31.1035
 
-def get_krx_gold_price():
-    """금융위원회 공식 API에서 금 시세 가져오기"""
+
+class UpstreamDataError(RuntimeError):
+    """Raised when an upstream request fails or returns unusable data."""
+
+
+def _positive_float(value, label):
     try:
-        # KST 시간대
-        kst = timezone(timedelta(hours=9))
+        number = float(str(value).replace(",", ""))
+    except (TypeError, ValueError) as exc:
+        raise UpstreamDataError(f"Invalid {label}: {value!r}") from exc
+    if not math.isfinite(number) or number <= 0:
+        raise UpstreamDataError(f"Invalid {label}: {value!r}")
+    return number
 
-        # 최근 5일간 데이터 검색 (휴일/주말/연휴 고려)
-        for days_ago in range(5):
-            target_date = (datetime.now(kst) - timedelta(days=days_ago)).strftime("%Y%m%d")
 
-            params = {
-                "serviceKey": SERVICE_KEY,
-                "pageNo": "1",
-                "numOfRows": "10",
-                "resultType": "json",
-                "basDt": target_date
-            }
+def _optional_float(value, label):
+    if value in (None, ""):
+        return 0.0
+    try:
+        number = float(str(value).replace(",", ""))
+    except (TypeError, ValueError) as exc:
+        raise UpstreamDataError(f"Invalid {label}: {value!r}") from exc
+    if not math.isfinite(number):
+        raise UpstreamDataError(f"Invalid {label}: {value!r}")
+    return number
 
-            response = requests.get(OFFICIAL_API_URL, params=params, timeout=10)
+
+def _items_from_body(body):
+    items = body.get("items", {}).get("item", [])
+    if isinstance(items, dict):
+        return [items]
+    if isinstance(items, list):
+        return items
+    raise UpstreamDataError("Invalid KRX items payload")
+
+
+def get_krx_gold_price(api_key, now_kst=None):
+    """Return the latest official KRX close from a valid recent trading date."""
+    if not api_key:
+        raise UpstreamDataError("KOREADATA_API_KEY is required")
+    kst = timezone(timedelta(hours=9))
+    now_kst = now_kst or datetime.now(kst)
+
+    for days_ago in range(10):
+        target_date = (now_kst - timedelta(days=days_ago)).strftime("%Y%m%d")
+        params = {
+            "serviceKey": api_key,
+            "pageNo": "1",
+            "numOfRows": "10",
+            "resultType": "json",
+            "basDt": target_date,
+        }
+        try:
+            response = requests.get(OFFICIAL_API_URL, params=params, timeout=30)
             response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            raise UpstreamDataError(
+                f"Failed to fetch official KRX price ({type(exc).__name__})"
+            ) from exc
 
-            result = response.json()
+        header = payload.get("response", {}).get("header", {})
+        if str(header.get("resultCode")) not in {"0", "00"}:
+            raise UpstreamDataError(f"KRX API error: {header.get('resultMsg', 'unknown error')}")
 
-            # API 응답 확인
-            header = result.get("response", {}).get("header", {})
-            if header.get("resultCode") != "00":
-                print(f"API Error: {header.get('resultMsg')}")
-                continue
+        body = payload.get("response", {}).get("body", {})
+        for item in _items_from_body(body):
+            name = str(item.get("itmsNm", "")).lower()
+            if "1kg" in name and "미니" not in name:
+                return parse_official_api_item(item)
+        print(f"No standard 1kg KRX data for {target_date}; trying the previous date.")
 
-            body = result.get("response", {}).get("body", {})
-            total_count = body.get("totalCount", 0)
+    raise UpstreamDataError("No standard 1kg KRX data found in the last 10 calendar days")
 
-            if total_count > 0:
-                items = body.get("items", {}).get("item", [])
-
-                # 금 99.99_1kg 찾기
-                for item in items:
-                    itms_nm = item.get("itmsNm", "")
-                    if "1kg" in itms_nm.lower() and "미니" not in itms_nm.lower():
-                        print(f"Found gold data for {target_date}: {itms_nm}")
-                        return parse_official_api_item(item)
-
-                # 1kg 없으면 첫 번째 항목 사용
-                if items:
-                    print(f"Using first item for {target_date}: {items[0].get('itmsNm')}")
-                    return parse_official_api_item(items[0])
-
-            print(f"No data for {target_date}, trying previous day...")
-
-        print("No gold price data found in the last 5 days")
-        return None
-
-    except Exception as e:
-        print(f"Failed to fetch official API gold price: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
 
 def parse_official_api_item(item):
-    """공식 API 응답 항목 파싱"""
-    def safe_float(val):
-        if not val:
-            return 0.0
-        # 문자열로 변환 후 숫자로
-        try:
-            return float(str(val))
-        except ValueError:
-            return 0.0
-
-    def safe_int(val):
-        if not val:
-            return 0
-        try:
-            return int(str(val))
-        except ValueError:
-            return 0
+    raw_date = str(item.get("basDt", ""))
+    try:
+        datetime.strptime(raw_date, "%Y%m%d")
+    except ValueError as exc:
+        raise UpstreamDataError(f"Invalid KRX date: {raw_date!r}") from exc
 
     return {
         "name": item.get("itmsNm", ""),
-        "price": safe_float(item.get("clpr", 0)),  # 종가
-        "change": safe_float(item.get("vs", 0)),  # 전일대비
-        "changePercent": safe_float(item.get("fltRt", 0)),  # 등락률
-        "high": safe_float(item.get("hipr", 0)),  # 고가
-        "low": safe_float(item.get("lopr", 0)),  # 저가
-        "volume": safe_int(item.get("trqu", 0)),  # 거래량
-        "date": item.get("basDt", "")
+        "price": _positive_float(item.get("clpr"), "KRX close"),
+        "change": _optional_float(item.get("vs"), "KRX change"),
+        "changePercent": _optional_float(item.get("fltRt"), "KRX change percent"),
+        "high": _optional_float(item.get("hipr"), "KRX high"),
+        "low": _optional_float(item.get("lopr"), "KRX low"),
+        "volume": int(_optional_float(item.get("trqu"), "KRX volume")),
+        "date": raw_date,
     }
 
-def get_international_gold_price():
-    """Gold-API.com에서 국제 금시세 가져오기 (USD/oz)"""
+
+def get_international_gold_price(fetched_at):
     try:
-        response = requests.get("https://api.gold-api.com/price/XAU", timeout=10)
+        response = requests.get(GOLD_API_URL, timeout=30)
         response.raise_for_status()
-        data = response.json()
-        return data.get("price", 0)
-    except Exception as e:
-        print(f"Failed to fetch international gold price: {e}")
-        return None
+        payload = response.json()
+    except Exception as exc:
+        raise UpstreamDataError(
+            f"Failed to fetch international gold price ({type(exc).__name__})"
+        ) from exc
+
+    price = _positive_float(payload.get("price"), "international gold price")
+    as_of = payload.get("updatedAt") or payload.get("timestamp") or fetched_at.isoformat()
+    return price, str(as_of)
+
 
 def get_exchange_rate():
-    """Frankfurter API에서 환율 가져오기"""
     try:
-        response = requests.get("https://api.frankfurter.app/latest?from=USD&to=KRW", timeout=10)
+        response = requests.get(FRANKFURTER_URL, timeout=30)
         response.raise_for_status()
-        data = response.json()
-        return data.get("rates", {}).get("KRW", 1400)
-    except Exception as e:
-        print(f"Failed to fetch exchange rate: {e}")
-        return 1400  # 기본값
+        payload = response.json()
+    except Exception as exc:
+        raise UpstreamDataError(
+            f"Failed to fetch exchange rate ({type(exc).__name__})"
+        ) from exc
 
-def main():
-    # KST 시간대
-    kst = timezone(timedelta(hours=9))
-    now_kst = datetime.now(kst)
-    print(f"Fetching realtime gold price at {now_kst.isoformat()}")
+    rate = _positive_float(payload.get("rates", {}).get("KRW"), "USD/KRW rate")
+    rate_date = str(payload.get("date", ""))
+    try:
+        datetime.strptime(rate_date, "%Y-%m-%d")
+    except ValueError as exc:
+        raise UpstreamDataError(f"Invalid exchange-rate date: {rate_date!r}") from exc
+    return rate, rate_date
 
-    # 데이터 가져오기
-    krx_data = get_krx_gold_price()
-    international_price = get_international_gold_price()
-    exchange_rate = get_exchange_rate()
 
-    print(f"KRX data: {krx_data}")
-    print(f"International price: {international_price} USD/oz")
-    print(f"Exchange rate: {exchange_rate} KRW/USD")
-
-    # 한국 금시세
-    korean_price = krx_data["price"] if krx_data else 0
-    korean_change = krx_data["change"] if krx_data else 0
-    korean_change_percent = krx_data["changePercent"] if krx_data else 0
-    data_date = krx_data["date"] if krx_data else ""
-
-    # 국제 금시세를 원/g로 변환
-    international_price_krw = (international_price / 31.1035) * exchange_rate if international_price else 0
-
-    # 프리미엄 계산
-    premium = 0
-    if international_price_krw > 0 and korean_price > 0:
-        premium = ((korean_price - international_price_krw) / international_price_krw) * 100
-
-    # 결과 저장
-    result = {
-        "lastUpdated": now_kst.isoformat(),
-        "dataDate": data_date,  # 실제 시세 날짜 (YYYYMMDD)
+def build_result(
+    fetched_at,
+    krx_data,
+    international_price,
+    international_as_of,
+    exchange_rate,
+    exchange_rate_date,
+):
+    international_price_krw = international_price / TROY_OUNCE_GRAMS * exchange_rate
+    return {
+        "lastUpdated": fetched_at.isoformat(),
+        "dataDate": krx_data["date"],
         "korean": {
-            "price": round(korean_price, 2),
-            "change": round(korean_change, 2),
-            "changePercent": round(korean_change_percent, 2),
-            "source": "KRX" if krx_data else "estimated"
+            "price": round(krx_data["price"], 2),
+            "change": round(krx_data["change"], 2),
+            "changePercent": round(krx_data["changePercent"], 2),
+            "source": "KRX",
         },
         "international": {
-            "priceUsd": round(international_price, 2) if international_price else 0,
-            "priceKrw": round(international_price_krw, 2)
+            "priceUsd": round(international_price, 2),
+            "priceKrw": round(international_price_krw, 2),
+            "asOf": international_as_of,
         },
         "exchangeRate": round(exchange_rate, 2),
-        "premium": round(premium, 2)
+        "exchangeRateDate": exchange_rate_date,
+        "premium": None,
+        "premiumAvailable": False,
     }
 
-    print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
 
-    # 파일 저장
-    with open("realtime.json", "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2, ensure_ascii=False)
+def run(now_kst=None, api_key=None):
+    kst = timezone(timedelta(hours=9))
+    now_kst = now_kst or datetime.now(kst)
+    api_key = api_key if api_key is not None else os.environ.get("KOREADATA_API_KEY", "")
+    if not api_key:
+        raise UpstreamDataError("KOREADATA_API_KEY is required")
 
-    print("Saved to realtime.json")
+    print(f"Fetching gold price snapshot at {now_kst.isoformat()}")
+    krx_data = get_krx_gold_price(api_key, now_kst)
+    international_price, international_as_of = get_international_gold_price(now_kst)
+    exchange_rate, exchange_rate_date = get_exchange_rate()
+    result = build_result(
+        now_kst,
+        krx_data,
+        international_price,
+        international_as_of,
+        exchange_rate,
+        exchange_rate_date,
+    )
+
+    with open("realtime.json", "w", encoding="utf-8") as output_file:
+        json.dump(result, output_file, indent=2, ensure_ascii=False)
+    print("Saved realtime.json with premium marked unavailable across different as-of times.")
+    return 0
+
+
+def main():
+    try:
+        return run()
+    except UpstreamDataError as exc:
+        print(f"Realtime update failed: {exc}", file=sys.stderr)
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
