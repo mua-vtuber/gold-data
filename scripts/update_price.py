@@ -2,6 +2,7 @@ import json
 import math
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -12,6 +13,8 @@ LBMA_API_URL = "https://prices.lbma.org.uk/json/gold_pm.json"
 FRANKFURTER_API_URL = "https://api.frankfurter.app"
 TROY_OUNCE_GRAMS = 31.1035
 PAGE_SIZE = 1000
+KRX_MAX_ATTEMPTS = 3
+DAILY_LOOKBACK_DAYS = 90
 
 
 class UpstreamDataError(RuntimeError):
@@ -42,6 +45,33 @@ def _is_standard_1kg(item):
     return "1kg" in name and "미니" not in name
 
 
+def _fetch_krx_payload(params):
+    last_error = None
+    for attempt in range(1, KRX_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(KRX_API_URL, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_error = exc
+            if attempt == KRX_MAX_ATTEMPTS:
+                break
+            delay = 2 ** (attempt - 1)
+            print(
+                f"KRX history request attempt {attempt} failed; retrying in {delay}s.",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+        except Exception as exc:
+            raise UpstreamDataError(
+                f"Failed to fetch KRX history ({type(exc).__name__})"
+            ) from exc
+
+    raise UpstreamDataError(
+        f"Failed to fetch KRX history ({type(last_error).__name__})"
+    ) from last_error
+
+
 def get_korean_gold_prices(api_key, start_date, end_date):
     """Return every official KRX 1kg close in the inclusive date range."""
     if not api_key:
@@ -59,14 +89,7 @@ def get_korean_gold_prices(api_key, start_date, end_date):
             "beginBasDt": start_date.replace("-", ""),
             "endBasDt": end_date.replace("-", ""),
         }
-        try:
-            response = requests.get(KRX_API_URL, params=params, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:
-            raise UpstreamDataError(
-                f"Failed to fetch KRX history ({type(exc).__name__})"
-            ) from exc
+        payload = _fetch_krx_payload(params)
 
         header = payload.get("response", {}).get("header", {})
         if str(header.get("resultCode")) not in {"0", "00"}:
@@ -280,9 +303,15 @@ def run(mode, now_kst=None, koreadata_api_key=None):
 
     history = load_history()
     existing_dates = {str(item["date"]) for item in history.get("data", [])}
-    start_date = min(existing_dates) if existing_dates else (now_kst - timedelta(days=30)).strftime(
-        "%Y-%m-%d"
-    )
+    if not existing_dates:
+        start_date = (now_kst - timedelta(days=30)).strftime("%Y-%m-%d")
+    elif mode == "realtime":
+        start_date = max(existing_dates)
+    else:
+        rolling_start = (now_kst - timedelta(days=DAILY_LOOKBACK_DAYS)).strftime(
+            "%Y-%m-%d"
+        )
+        start_date = max(min(existing_dates), rolling_start)
     print(f"Mode: {mode}; scanning official KRX dates from {start_date} through {today}")
 
     # The official API publishes KRX data on the following business day. Do not

@@ -2,6 +2,7 @@ import json
 import math
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -11,6 +12,7 @@ OFFICIAL_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInf
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
 FRANKFURTER_URL = "https://api.frankfurter.app/latest?from=USD&to=KRW"
 TROY_OUNCE_GRAMS = 31.1035
+KRX_MAX_ATTEMPTS = 3
 
 
 class UpstreamDataError(RuntimeError):
@@ -48,6 +50,33 @@ def _items_from_body(body):
     raise UpstreamDataError("Invalid KRX items payload")
 
 
+def _fetch_official_payload(params):
+    last_error = None
+    for attempt in range(1, KRX_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(OFFICIAL_API_URL, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_error = exc
+            if attempt == KRX_MAX_ATTEMPTS:
+                break
+            delay = 2 ** (attempt - 1)
+            print(
+                f"KRX realtime request attempt {attempt} failed; retrying in {delay}s.",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+        except Exception as exc:
+            raise UpstreamDataError(
+                f"Failed to fetch official KRX price ({type(exc).__name__})"
+            ) from exc
+
+    raise UpstreamDataError(
+        f"Failed to fetch official KRX price ({type(last_error).__name__})"
+    ) from last_error
+
+
 def get_krx_gold_price(api_key, now_kst=None):
     """Return the latest official KRX close from a valid recent trading date."""
     if not api_key:
@@ -64,14 +93,7 @@ def get_krx_gold_price(api_key, now_kst=None):
             "resultType": "json",
             "basDt": target_date,
         }
-        try:
-            response = requests.get(OFFICIAL_API_URL, params=params, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:
-            raise UpstreamDataError(
-                f"Failed to fetch official KRX price ({type(exc).__name__})"
-            ) from exc
+        payload = _fetch_official_payload(params)
 
         header = payload.get("response", {}).get("header", {})
         if str(header.get("resultCode")) not in {"0", "00"}:

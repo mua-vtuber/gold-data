@@ -7,6 +7,30 @@ from scripts import fetch_krx_realtime
 
 
 class FetchKrxRealtimeTest(unittest.TestCase):
+    @staticmethod
+    def _krx_response():
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "response": {
+                "header": {"resultCode": "00"},
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "basDt": "20260731",
+                                "itmsNm": "금 99.99_1Kg",
+                                "clpr": "187460",
+                                "vs": "1470",
+                                "fltRt": "0.79",
+                            }
+                        ]
+                    }
+                },
+            }
+        }
+        return response
+
     def test_missing_api_key_fails_before_writing(self):
         with (
             patch.dict(os.environ, {}, clear=True),
@@ -67,6 +91,28 @@ class FetchKrxRealtimeTest(unittest.TestCase):
                 )
 
         self.assertNotIn("secret-value", str(raised.exception))
+
+    def test_krx_request_retries_transient_connect_timeout(self):
+        with (
+            patch.object(
+                fetch_krx_realtime.requests,
+                "get",
+                side_effect=[
+                    fetch_krx_realtime.requests.ConnectTimeout("timeout"),
+                    self._krx_response(),
+                ],
+            ) as request,
+            patch.object(fetch_krx_realtime.time, "sleep") as sleep,
+        ):
+            result = fetch_krx_realtime.get_krx_gold_price(
+                "test-key",
+                datetime(2026, 8, 3, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(result["date"], "20260731")
+        self.assertEqual(result["price"], 187460.0)
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
 
     def test_cli_main_returns_nonzero_for_upstream_failure(self):
         with patch.object(

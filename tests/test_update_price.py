@@ -77,6 +77,30 @@ class UpdatePriceTest(unittest.TestCase):
 
         self.assertNotIn("secret-value", str(raised.exception))
 
+    def test_krx_history_retries_transient_connect_timeout(self):
+        response = self._krx_response(
+            "20260731",
+            "187460",
+            page_size=1,
+            total_count=1,
+        )
+
+        with (
+            patch.object(
+                update_price.requests,
+                "get",
+                side_effect=[update_price.requests.ConnectTimeout("timeout"), response],
+            ) as request,
+            patch.object(update_price.time, "sleep") as sleep,
+        ):
+            prices = update_price.get_korean_gold_prices(
+                "test-key", "2026-07-31", "2026-08-03"
+            )
+
+        self.assertEqual(prices, {"2026-07-31": 187460.0})
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
+
     def test_valid_empty_exchange_rates_are_a_market_holiday(self):
         response = unittest.mock.Mock()
         response.raise_for_status.return_value = None
@@ -168,6 +192,64 @@ class UpdatePriceTest(unittest.TestCase):
             ],
         )
         self.assertEqual(saved["lastUpdated"], "2026-07-31")
+
+    def test_realtime_mode_scans_from_latest_saved_date(self):
+        history = {
+            "lastUpdated": "2026-07-31",
+            "data": [
+                {"date": "2020-01-02", "koreanPrice": 60000.0},
+                {"date": "2026-07-31", "koreanPrice": 187460.0},
+            ],
+        }
+
+        with (
+            patch.object(update_price, "load_history", return_value=history),
+            patch.object(
+                update_price,
+                "get_korean_gold_prices",
+                return_value={},
+            ) as get_prices,
+            patch.object(update_price, "validate_history"),
+        ):
+            result = update_price.run(
+                "realtime",
+                now_kst=datetime(2026, 8, 3, tzinfo=timezone.utc),
+                koreadata_api_key="test-key",
+            )
+
+        self.assertEqual(result, 0)
+        get_prices.assert_called_once_with(
+            "test-key", "2026-07-31", "2026-08-03"
+        )
+
+    def test_daily_mode_scans_only_rolling_window(self):
+        history = {
+            "lastUpdated": "2026-07-31",
+            "data": [
+                {"date": "2020-01-02", "koreanPrice": 60000.0},
+                {"date": "2026-07-31", "koreanPrice": 187460.0},
+            ],
+        }
+
+        with (
+            patch.object(update_price, "load_history", return_value=history),
+            patch.object(
+                update_price,
+                "get_korean_gold_prices",
+                return_value={},
+            ) as get_prices,
+            patch.object(update_price, "validate_history"),
+        ):
+            result = update_price.run(
+                "daily",
+                now_kst=datetime(2026, 8, 3, tzinfo=timezone.utc),
+                koreadata_api_key="test-key",
+            )
+
+        self.assertEqual(result, 0)
+        get_prices.assert_called_once_with(
+            "test-key", "2026-05-05", "2026-08-03"
+        )
 
     def test_run_does_not_call_other_upstreams_when_no_krx_date_is_missing(self):
         history = {
