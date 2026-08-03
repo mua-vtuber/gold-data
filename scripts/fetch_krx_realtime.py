@@ -83,30 +83,30 @@ def get_krx_gold_price(api_key, now_kst=None):
         raise UpstreamDataError("KOREADATA_API_KEY is required")
     kst = timezone(timedelta(hours=9))
     now_kst = now_kst or datetime.now(kst)
+    params = {
+        "serviceKey": api_key,
+        "pageNo": "1",
+        "numOfRows": "100",
+        "resultType": "json",
+        "beginBasDt": (now_kst - timedelta(days=9)).strftime("%Y%m%d"),
+        "endBasDt": now_kst.strftime("%Y%m%d"),
+    }
+    payload = _fetch_official_payload(params)
 
-    for days_ago in range(10):
-        target_date = (now_kst - timedelta(days=days_ago)).strftime("%Y%m%d")
-        params = {
-            "serviceKey": api_key,
-            "pageNo": "1",
-            "numOfRows": "10",
-            "resultType": "json",
-            "basDt": target_date,
-        }
-        payload = _fetch_official_payload(params)
+    header = payload.get("response", {}).get("header", {})
+    if str(header.get("resultCode")) not in {"0", "00"}:
+        raise UpstreamDataError(f"KRX API error: {header.get('resultMsg', 'unknown error')}")
 
-        header = payload.get("response", {}).get("header", {})
-        if str(header.get("resultCode")) not in {"0", "00"}:
-            raise UpstreamDataError(f"KRX API error: {header.get('resultMsg', 'unknown error')}")
+    body = payload.get("response", {}).get("body", {})
+    standard_items = []
+    for item in _items_from_body(body):
+        name = str(item.get("itmsNm", "")).lower()
+        if "1kg" in name and "미니" not in name:
+            standard_items.append(parse_official_api_item(item))
 
-        body = payload.get("response", {}).get("body", {})
-        for item in _items_from_body(body):
-            name = str(item.get("itmsNm", "")).lower()
-            if "1kg" in name and "미니" not in name:
-                return parse_official_api_item(item)
-        print(f"No standard 1kg KRX data for {target_date}; trying the previous date.")
-
-    raise UpstreamDataError("No standard 1kg KRX data found in the last 10 calendar days")
+    if not standard_items:
+        raise UpstreamDataError("No standard 1kg KRX data found in the last 10 calendar days")
+    return max(standard_items, key=lambda item: item["date"])
 
 
 def parse_official_api_item(item):

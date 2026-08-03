@@ -114,6 +114,43 @@ class FetchKrxRealtimeTest(unittest.TestCase):
         self.assertEqual(request.call_count, 2)
         sleep.assert_called_once_with(1)
 
+    def test_krx_request_uses_recent_range_and_selects_latest_date(self):
+        response = self._krx_response()
+        response.json.return_value["response"]["body"]["items"]["item"] = [
+            {
+                "basDt": "20260730",
+                "itmsNm": "금 99.99_1Kg",
+                "clpr": "185990",
+                "vs": "-100",
+                "fltRt": "-0.05",
+            },
+            {
+                "basDt": "20260731",
+                "itmsNm": "금 99.99_1Kg",
+                "clpr": "187460",
+                "vs": "1470",
+                "fltRt": "0.79",
+            },
+        ]
+
+        with patch.object(
+            fetch_krx_realtime.requests,
+            "get",
+            return_value=response,
+        ) as request:
+            result = fetch_krx_realtime.get_krx_gold_price(
+                "test-key",
+                datetime(2026, 8, 3, tzinfo=timezone.utc),
+            )
+
+        params = request.call_args.kwargs["params"]
+        self.assertEqual(params["beginBasDt"], "20260725")
+        self.assertEqual(params["endBasDt"], "20260803")
+        self.assertNotIn("basDt", params)
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(result["date"], "20260731")
+        self.assertEqual(result["price"], 187460.0)
+
     def test_cli_main_returns_nonzero_for_upstream_failure(self):
         with patch.object(
             fetch_krx_realtime,
