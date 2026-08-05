@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from datetime import datetime, timezone
@@ -77,6 +78,216 @@ class FetchKrxRealtimeTest(unittest.TestCase):
         ):
             with self.assertRaises(fetch_krx_realtime.UpstreamDataError):
                 fetch_krx_realtime.get_exchange_rate()
+
+    def test_exchange_rate_retries_transient_timeout(self):
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "rates": {"KRW": 1427.11},
+            "date": "2026-08-04",
+        }
+
+        with (
+            patch.object(
+                fetch_krx_realtime.requests,
+                "get",
+                side_effect=[
+                    fetch_krx_realtime.requests.ReadTimeout("timeout"),
+                    response,
+                ],
+            ) as request,
+            patch.object(fetch_krx_realtime.time, "sleep") as sleep,
+        ):
+            rate, rate_date = fetch_krx_realtime.get_exchange_rate()
+
+        self.assertEqual(rate, 1427.11)
+        self.assertEqual(rate_date, "2026-08-04")
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_exchange_rate_retries_http_503(self):
+        unavailable = unittest.mock.Mock()
+        unavailable.status_code = 503
+        unavailable.raise_for_status.side_effect = fetch_krx_realtime.requests.HTTPError(
+            "service unavailable",
+            response=unavailable,
+        )
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "rates": {"KRW": 1427.11},
+            "date": "2026-08-04",
+        }
+
+        with (
+            patch.object(
+                fetch_krx_realtime.requests,
+                "get",
+                side_effect=[unavailable, response],
+            ) as request,
+            patch.object(fetch_krx_realtime.time, "sleep") as sleep,
+        ):
+            rate, _ = fetch_krx_realtime.get_exchange_rate()
+
+        self.assertEqual(rate, 1427.11)
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_international_gold_price_retries_transient_timeout(self):
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "price": 4164.0,
+            "updatedAt": "2026-08-05T06:01:13Z",
+        }
+        now = datetime(2026, 8, 5, 6, 1, tzinfo=timezone.utc)
+
+        with (
+            patch.object(
+                fetch_krx_realtime.requests,
+                "get",
+                side_effect=[
+                    fetch_krx_realtime.requests.ConnectTimeout("timeout"),
+                    response,
+                ],
+            ) as request,
+            patch.object(fetch_krx_realtime.time, "sleep") as sleep,
+        ):
+            price, as_of = fetch_krx_realtime.get_international_gold_price(now)
+
+        self.assertEqual(price, 4164.0)
+        self.assertEqual(as_of, "2026-08-05T06:01:13Z")
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    @staticmethod
+    def _cached_result():
+        return {
+            "lastUpdated": "2026-08-05T15:01:27.068685+09:00",
+            "dataDate": "20260804",
+            "korean": {
+                "price": 186720.0,
+                "change": 290.0,
+                "changePercent": 0.16,
+                "source": "KRX",
+            },
+            "international": {
+                "priceUsd": 4164.0,
+                "priceKrw": 191055.22,
+                "asOf": "2026-08-05T06:01:13Z",
+            },
+            "exchangeRate": 1427.11,
+            "exchangeRateDate": "2026-08-04",
+            "premium": None,
+            "premiumAvailable": False,
+        }
+
+    def test_run_uses_recent_cached_krx_data_after_upstream_failure(self):
+        now = datetime(2026, 8, 5, 16, 0, tzinfo=timezone.utc)
+
+        with (
+            patch.object(
+                fetch_krx_realtime,
+                "get_krx_gold_price",
+                side_effect=fetch_krx_realtime.TransientUpstreamDataError(
+                    "KRX timeout"
+                ),
+            ),
+            patch.object(
+                fetch_krx_realtime,
+                "get_international_gold_price",
+                return_value=(4170.0, "2026-08-05T07:00:00Z"),
+            ),
+            patch.object(
+                fetch_krx_realtime,
+                "get_exchange_rate",
+                return_value=(1428.0, "2026-08-05"),
+            ),
+            patch("builtins.open", mock_open(read_data=json.dumps(self._cached_result()))),
+            patch.object(fetch_krx_realtime.json, "dump") as dump,
+        ):
+            result = fetch_krx_realtime.run(now_kst=now, api_key="test-key")
+
+        self.assertEqual(result, 0)
+        saved = dump.call_args.args[0]
+        self.assertEqual(saved["dataDate"], "20260804")
+        self.assertEqual(saved["korean"]["price"], 186720.0)
+        self.assertEqual(saved["international"]["priceUsd"], 4170.0)
+
+    def test_run_uses_recent_cached_exchange_rate_after_upstream_failure(self):
+        now = datetime(2026, 8, 5, 16, 0, tzinfo=timezone.utc)
+        krx_data = {
+            "name": "금 99.99_1Kg",
+            "price": 186720.0,
+            "change": 290.0,
+            "changePercent": 0.16,
+            "high": 187000.0,
+            "low": 185000.0,
+            "volume": 100,
+            "date": "20260804",
+        }
+
+        with (
+            patch.object(fetch_krx_realtime, "get_krx_gold_price", return_value=krx_data),
+            patch.object(
+                fetch_krx_realtime,
+                "get_international_gold_price",
+                return_value=(4170.0, "2026-08-05T07:00:00Z"),
+            ),
+            patch.object(
+                fetch_krx_realtime,
+                "get_exchange_rate",
+                side_effect=fetch_krx_realtime.TransientUpstreamDataError(
+                    "FX timeout"
+                ),
+            ),
+            patch("builtins.open", mock_open(read_data=json.dumps(self._cached_result()))),
+            patch.object(fetch_krx_realtime.json, "dump") as dump,
+        ):
+            result = fetch_krx_realtime.run(now_kst=now, api_key="test-key")
+
+        self.assertEqual(result, 0)
+        saved = dump.call_args.args[0]
+        self.assertEqual(saved["exchangeRate"], 1427.11)
+        self.assertEqual(saved["exchangeRateDate"], "2026-08-04")
+
+    def test_run_rejects_expired_cached_krx_data(self):
+        now = datetime(2026, 8, 20, 16, 0, tzinfo=timezone.utc)
+
+        with (
+            patch.object(
+                fetch_krx_realtime,
+                "get_krx_gold_price",
+                side_effect=fetch_krx_realtime.TransientUpstreamDataError(
+                    "KRX timeout"
+                ),
+            ),
+            patch("builtins.open", mock_open(read_data=json.dumps(self._cached_result()))),
+        ):
+            with self.assertRaisesRegex(
+                fetch_krx_realtime.UpstreamDataError,
+                "Cached KRX data is too old",
+            ):
+                fetch_krx_realtime.run(now_kst=now, api_key="test-key")
+
+    def test_run_does_not_mask_non_transient_krx_failure(self):
+        now = datetime(2026, 8, 5, 16, 0, tzinfo=timezone.utc)
+
+        with (
+            patch.object(
+                fetch_krx_realtime,
+                "get_krx_gold_price",
+                side_effect=fetch_krx_realtime.UpstreamDataError("invalid KRX payload"),
+            ),
+            patch.object(fetch_krx_realtime, "_cached_krx_data") as cached_krx,
+        ):
+            with self.assertRaisesRegex(
+                fetch_krx_realtime.UpstreamDataError,
+                "invalid KRX payload",
+            ):
+                fetch_krx_realtime.run(now_kst=now, api_key="test-key")
+
+        cached_krx.assert_not_called()
 
     def test_krx_request_failure_does_not_echo_api_key(self):
         with patch.object(

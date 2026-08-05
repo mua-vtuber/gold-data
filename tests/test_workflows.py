@@ -26,6 +26,16 @@ class WorkflowTest(unittest.TestCase):
             update_position = workflow.index("python scripts/")
             self.assertLess(test_position, update_position, workflow_name)
 
+    def test_workflows_use_node24_actions(self):
+        for workflow_path in (ROOT / ".github" / "workflows").glob("*.yml"):
+            workflow = workflow_path.read_text(encoding="utf-8")
+            if "actions/checkout@" in workflow:
+                self.assertIn("actions/checkout@v5", workflow, workflow_path.name)
+                self.assertNotIn("actions/checkout@v4", workflow, workflow_path.name)
+            if "actions/setup-python@" in workflow:
+                self.assertIn("actions/setup-python@v6", workflow, workflow_path.name)
+                self.assertNotIn("actions/setup-python@v5", workflow, workflow_path.name)
+
 
 if __name__ == "__main__":
     unittest.main()

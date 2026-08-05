@@ -12,11 +12,18 @@ OFFICIAL_API_URL = "https://apis.data.go.kr/1160100/service/GetGeneralProductInf
 GOLD_API_URL = "https://api.gold-api.com/price/XAU"
 FRANKFURTER_URL = "https://api.frankfurter.app/latest?from=USD&to=KRW"
 TROY_OUNCE_GRAMS = 31.1035
-KRX_MAX_ATTEMPTS = 3
+REQUEST_MAX_ATTEMPTS = 3
+REQUEST_TIMEOUT = (10, 30)
+KRX_CACHE_MAX_AGE_DAYS = 10
+EXCHANGE_RATE_CACHE_MAX_AGE_DAYS = 7
 
 
 class UpstreamDataError(RuntimeError):
     """Raised when an upstream request fails or returns unusable data."""
+
+
+class TransientUpstreamDataError(UpstreamDataError):
+    """Raised when retries are exhausted for a temporary upstream failure."""
 
 
 def _positive_float(value, label):
@@ -50,31 +57,48 @@ def _items_from_body(body):
     raise UpstreamDataError("Invalid KRX items payload")
 
 
-def _fetch_official_payload(params):
+def _is_retryable_request_error(exc):
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    if not isinstance(exc, requests.HTTPError) or exc.response is None:
+        return False
+    status_code = exc.response.status_code
+    return status_code in {408, 429} or 500 <= status_code < 600
+
+
+def _fetch_json(url, label, *, params=None):
     last_error = None
-    for attempt in range(1, KRX_MAX_ATTEMPTS + 1):
+    for attempt in range(1, REQUEST_MAX_ATTEMPTS + 1):
         try:
-            response = requests.get(OFFICIAL_API_URL, params=params, timeout=30)
+            request_options = {"timeout": REQUEST_TIMEOUT}
+            if params is not None:
+                request_options["params"] = params
+            response = requests.get(url, **request_options)
             response.raise_for_status()
             return response.json()
-        except (requests.Timeout, requests.ConnectionError) as exc:
+        except Exception as exc:
             last_error = exc
-            if attempt == KRX_MAX_ATTEMPTS:
+            if not _is_retryable_request_error(exc) or attempt == REQUEST_MAX_ATTEMPTS:
                 break
             delay = 2 ** (attempt - 1)
             print(
-                f"KRX realtime request attempt {attempt} failed; retrying in {delay}s.",
+                f"{label} request attempt {attempt} failed; retrying in {delay}s.",
                 file=sys.stderr,
             )
             time.sleep(delay)
-        except Exception as exc:
-            raise UpstreamDataError(
-                f"Failed to fetch official KRX price ({type(exc).__name__})"
-            ) from exc
 
-    raise UpstreamDataError(
-        f"Failed to fetch official KRX price ({type(last_error).__name__})"
+    error_class = (
+        TransientUpstreamDataError
+        if _is_retryable_request_error(last_error)
+        else UpstreamDataError
+    )
+    raise error_class(
+        f"Failed to fetch {label} ({type(last_error).__name__})"
     ) from last_error
+
+
+def _fetch_official_payload(params):
+    return _fetch_json(OFFICIAL_API_URL, "official KRX price", params=params)
 
 
 def get_krx_gold_price(api_key, now_kst=None):
@@ -129,14 +153,7 @@ def parse_official_api_item(item):
 
 
 def get_international_gold_price(fetched_at):
-    try:
-        response = requests.get(GOLD_API_URL, timeout=30)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as exc:
-        raise UpstreamDataError(
-            f"Failed to fetch international gold price ({type(exc).__name__})"
-        ) from exc
+    payload = _fetch_json(GOLD_API_URL, "international gold price")
 
     price = _positive_float(payload.get("price"), "international gold price")
     as_of = payload.get("updatedAt") or payload.get("timestamp") or fetched_at.isoformat()
@@ -144,14 +161,7 @@ def get_international_gold_price(fetched_at):
 
 
 def get_exchange_rate():
-    try:
-        response = requests.get(FRANKFURTER_URL, timeout=30)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as exc:
-        raise UpstreamDataError(
-            f"Failed to fetch exchange rate ({type(exc).__name__})"
-        ) from exc
+    payload = _fetch_json(FRANKFURTER_URL, "exchange rate")
 
     rate = _positive_float(payload.get("rates", {}).get("KRW"), "USD/KRW rate")
     rate_date = str(payload.get("date", ""))
@@ -160,6 +170,61 @@ def get_exchange_rate():
     except ValueError as exc:
         raise UpstreamDataError(f"Invalid exchange-rate date: {rate_date!r}") from exc
     return rate, rate_date
+
+
+def _load_cached_result():
+    try:
+        with open("realtime.json", "r", encoding="utf-8") as input_file:
+            cached = json.load(input_file)
+    except Exception as exc:
+        raise UpstreamDataError(
+            f"Cached realtime data is unavailable ({type(exc).__name__})"
+        ) from exc
+    if not isinstance(cached, dict):
+        raise UpstreamDataError("Cached realtime data is invalid")
+    return cached
+
+
+def _cache_age_days(raw_date, date_format, now_kst, label):
+    try:
+        cached_date = datetime.strptime(raw_date, date_format).date()
+    except ValueError as exc:
+        raise UpstreamDataError(f"Cached {label} date is invalid: {raw_date!r}") from exc
+    age_days = (now_kst.date() - cached_date).days
+    if age_days < 0:
+        raise UpstreamDataError(f"Cached {label} date is in the future: {raw_date!r}")
+    return age_days
+
+
+def _cached_krx_data(now_kst):
+    cached = _load_cached_result()
+    raw_date = str(cached.get("dataDate", ""))
+    age_days = _cache_age_days(raw_date, "%Y%m%d", now_kst, "KRX")
+    if age_days > KRX_CACHE_MAX_AGE_DAYS:
+        raise UpstreamDataError(f"Cached KRX data is too old: {raw_date!r}")
+
+    korean = cached.get("korean")
+    if not isinstance(korean, dict) or korean.get("source") != "KRX":
+        raise UpstreamDataError("Cached KRX data is invalid")
+    return {
+        "price": _positive_float(korean.get("price"), "cached KRX close"),
+        "change": _optional_float(korean.get("change"), "cached KRX change"),
+        "changePercent": _optional_float(
+            korean.get("changePercent"),
+            "cached KRX change percent",
+        ),
+        "date": raw_date,
+    }
+
+
+def _cached_exchange_rate(now_kst):
+    cached = _load_cached_result()
+    raw_date = str(cached.get("exchangeRateDate", ""))
+    age_days = _cache_age_days(raw_date, "%Y-%m-%d", now_kst, "exchange-rate")
+    if age_days > EXCHANGE_RATE_CACHE_MAX_AGE_DAYS:
+        raise UpstreamDataError(f"Cached exchange-rate data is too old: {raw_date!r}")
+    rate = _positive_float(cached.get("exchangeRate"), "cached USD/KRW rate")
+    return rate, raw_date
 
 
 def build_result(
@@ -200,9 +265,25 @@ def run(now_kst=None, api_key=None):
         raise UpstreamDataError("KOREADATA_API_KEY is required")
 
     print(f"Fetching gold price snapshot at {now_kst.isoformat()}")
-    krx_data = get_krx_gold_price(api_key, now_kst)
+    try:
+        krx_data = get_krx_gold_price(api_key, now_kst)
+    except TransientUpstreamDataError as upstream_error:
+        krx_data = _cached_krx_data(now_kst)
+        print(
+            f"::warning title=KRX API unavailable::{upstream_error}; "
+            f"using cached KRX data from {krx_data['date']}.",
+            file=sys.stderr,
+        )
     international_price, international_as_of = get_international_gold_price(now_kst)
-    exchange_rate, exchange_rate_date = get_exchange_rate()
+    try:
+        exchange_rate, exchange_rate_date = get_exchange_rate()
+    except TransientUpstreamDataError as upstream_error:
+        exchange_rate, exchange_rate_date = _cached_exchange_rate(now_kst)
+        print(
+            f"::warning title=Exchange-rate API unavailable::{upstream_error}; "
+            f"using cached exchange rate from {exchange_rate_date}.",
+            file=sys.stderr,
+        )
     result = build_result(
         now_kst,
         krx_data,
