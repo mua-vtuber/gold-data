@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-08-12",
+  "lastUpdated": "2026-08-13",
   "data": [
     {
       "date": "2020-01-02",
@@ -13033,6 +13033,15 @@
       "internationalPriceKrw": 201685.94,
       "exchangeRate": 1417.13,
       "premium": -0.6,
+      "premiumAvailable": true
+    },
+    {
+      "date": "2026-08-13",
+      "koreanPrice": 200570.0,
+      "internationalPrice": 4373.0,
+      "internationalPriceKrw": 199685.83,
+      "exchangeRate": 1420.29,
+      "premium": 0.44,
       "premiumAvailable": true
     }
   ]
